@@ -217,26 +217,6 @@ P = rx.getP(mesh,'CC')
 from SimPEG.Maps import IdentityMap
 from scipy.fftpack import dct,idct
 class DCTMap(IdentityMap):
-    """
-        Changes the model into the physical property.
-
-        If \\(p\\) is the physical property and \\(m\\) is the model, then
-
-        .. math::
-
-            p = \\log(m)
-
-        and
-
-        .. math::
-
-            m = \\exp(p)
-
-        NOTE: If you have a model which is log conductivity
-        (ie. \\(m = \\log(\\sigma)\\)),
-        you should be using an ExpMap
-
-    """
 
     def __init__(self, mesh=None, nP=None, **kwargs):
         super(DCTMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
@@ -255,26 +235,6 @@ class DCTMap(IdentityMap):
 
 
 class iDCTMap(IdentityMap):
-    """
-        Changes the physical proprety into the model
-
-        If \\(p\\) is the physical property and \\(m\\) is the model, then
-
-        .. math::
-
-            p = \\log(m)
-
-        and
-
-        .. math::
-
-            m = \\exp(p)
-
-        NOTE: If you have a model which is log conductivity
-        (ie. \\(m = \\log(\\sigma)\\)),
-        you should be using an ExpMap
-
-    """
 
     def __init__(self, mesh, nP=None, **kwargs):
         super(iDCTMap, self).__init__(mesh=mesh, nP=nP, **kwargs)

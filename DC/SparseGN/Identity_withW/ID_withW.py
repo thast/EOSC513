@@ -213,90 +213,11 @@ N = np.c_[np.arange(-10.,12+1,2),np.ones(12)*z]
 rx = DC.Rx.Dipole(M,N)
 P = rx.getP(mesh,'CC')
 
-
-from SimPEG.Maps import IdentityMap
-from scipy.fftpack import dct,idct
-class DCTMap(IdentityMap):
-    """
-        Changes the model into the physical property.
-
-        If \\(p\\) is the physical property and \\(m\\) is the model, then
-
-        .. math::
-
-            p = \\log(m)
-
-        and
-
-        .. math::
-
-            m = \\exp(p)
-
-        NOTE: If you have a model which is log conductivity
-        (ie. \\(m = \\log(\\sigma)\\)),
-        you should be using an ExpMap
-
-    """
-
-    def __init__(self, mesh=None, nP=None, **kwargs):
-        super(DCTMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
-
-    def _transform(self, m):
-        return Utils.mkvc(dct(dct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
-
-    def deriv(self, m, v=None):
-        if v is not None:
-            return dct(dct(v.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho')
-        else:
-            print "not implemented"
-
-    def inverse(self, m):
-        return Utils.mkvc(idct(idct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
-
-
-class iDCTMap(IdentityMap):
-    """
-        Changes the physical proprety into the model
-
-        If \\(p\\) is the physical property and \\(m\\) is the model, then
-
-        .. math::
-
-            p = \\log(m)
-
-        and
-
-        .. math::
-
-            m = \\exp(p)
-
-        NOTE: If you have a model which is log conductivity
-        (ie. \\(m = \\log(\\sigma)\\)),
-        you should be using an ExpMap
-
-    """
-
-    def __init__(self, mesh, nP=None, **kwargs):
-        super(iDCTMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
-
-    def _transform(self, m):
-        return Utils.mkvc(idct(idct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
-
-    def deriv(self, m, v=None):
-        if v is not None:
-            return idct(idct(v.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho')
-        else:
-            print "not implemented"
-
-    def inverse(self, m):
-        return Utils.mkvc(dct(dct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
-
-
 import spgl1
 
 #Parameter for SPGL1 iterations
 nits = 10
-mdct = (-5.)*np.ones_like(mtrue)
+mID = (-5.)*np.ones_like(mtrue)
 it = 0
 #phi_d_normal = np.load('../phid_normal.npy')
 #ratio = np.r_[6.5,phi_d_normal[0:-1]/phi_d_normal[1:]]
@@ -309,7 +230,7 @@ nsubSrc = 5
 InnerIt = 1
 dmisfitsub = []
 dmisfitall = []
-dmisfitall.append(dmisAll.eval(mdct)/survey.nD)
+dmisfitall.append(dmisAll.eval(mID)/survey.nD)
 
 #Initialize Random Source
 W = np.random.randn(survey.nSrc,nsubSrc)
@@ -333,25 +254,25 @@ survey_r.dobs = d
 survey_r.std = np.ones_like(d)*0.05
 survey_r.eps = 1e-5*np.linalg.norm(survey_r.dobs)
 dmis = DataMisfit.l2_DataMisfit(survey_r)
-dmisfitsub.append(dmis.eval(mdct)/survey_r.nD)
+dmisfitsub.append(dmis.eval(mID)/survey_r.nD)
 
 problem.unpair()
 problem.pair(survey)
 
-print "end iteration: ",it, '; Overall Normalized Misfit: ', dmisAll.eval(mdct)/survey.nD
+print "end iteration: ",it, '; Overall Normalized Misfit: ', dmisAll.eval(mID)/survey.nD
 
-while (dmisAll.eval(mdct)/survey.nD)>0.5 and it<nits:
+while (dmisAll.eval(mID)/survey.nD)>0.5 and it<nits:
     
     problem.unpair()
     problem.pair(survey_r)
 
     def JS(x,mode):
         if mode == 1:
-            return problem.Jvec(mdct,x)
+            return problem.Jvec(mID,x)
         else:
-            return problem.Jtvec(mdct,x)
+            return problem.Jtvec(mID,x)
     
-    b = survey_r.dpred(mdct)-survey_r.dpred(mtrue)
+    b = survey_r.dpred(mID)-survey_r.dpred(mtrue)
 
     print "# of data: ", b.shape
 
@@ -360,17 +281,17 @@ while (dmisAll.eval(mdct)/survey.nD)>0.5 and it<nits:
     #tautol = 20000.
     x,resid,grad,info = spgl1.spg_bpdn(JS, b, sigma = sigtol,options=opts)
     #x,resid,grad,info = spgl1.spg_lasso(JS,b,tautol,opts)
-    #assert dmis.eval(mdct) > dmis.eval(mdct - x)
-    mdct = mdct - x
+    #assert dmis.eval(mID) > dmis.eval(mID - x)
+    mID = mID - x
     xlist.append(x)
     it +=1
-    print "end iteration: ",it, '; Subsample Normalized Misfit: ', dmis.eval(mdct)/survey_r.nD
-    dmisfitsub.append(dmis.eval(mdct)/survey_r.nD)
+    print "end iteration: ",it, '; Subsample Normalized Misfit: ', dmis.eval(mID)/survey_r.nD
+    dmisfitsub.append(dmis.eval(mID)/survey_r.nD)
 
     problem.unpair()
     problem.pair(survey)
-    dmisfitall.append(dmisAll.eval(mdct)/survey.nD)
-    print "Dmisfit compared to full dataset: ",dmisAll.eval(mdct)/survey.nD
+    dmisfitall.append(dmisAll.eval(mID)/survey.nD)
+    print "Dmisfit compared to full dataset: ",dmisAll.eval(mID)/survey.nD
 
     if np.mod(it,InnerIt) ==0:
         W = np.random.randn(survey.nSrc,nsubSrc)
@@ -396,17 +317,17 @@ while (dmisAll.eval(mdct)/survey.nD)>0.5 and it<nits:
         survey_r.dobs = d
         survey_r.std = np.ones_like(d)*0.05
         survey_r.eps = 1e-5*np.linalg.norm(survey_r.dobs)
-        print "end Update W; iteration: ",it, '; New Subsample Normalized Misfit: ', dmis.eval(mdct)/survey_r.nD
+        print "end Update W; iteration: ",it, '; New Subsample Normalized Misfit: ', dmis.eval(mID)/survey_r.nD
 
         problem.unpair()
         problem.pair(survey)
         
 np.save('./dmisfitsub.npy',dmisfitsub)
 np.save('./dmisfitall.npy',dmisfitall)
-np.save('./mfinal.npy',mdct)
+np.save('./mfinal.npy',mID)
 np.savez('./xlist.npz',xlist)
 
-mm = mesh.plotImage(mdct)
+mm = mesh.plotImage(mID)
 plt.colorbar(mm[0])
 plt.gca().set_xlim([-10.,10.])
 plt.gca().set_ylim([-10.,0.])

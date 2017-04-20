@@ -170,91 +170,11 @@ survey.eps = 1e-5*np.linalg.norm(survey.dobs)
 
 print '# of data: ', survey.dobs.shape
 
-from SimPEG.Maps import IdentityMap
-from scipy.fftpack import dct,idct
-class DCTMap(IdentityMap):
-    """
-        Changes the model into the physical property.
-
-        If \\(p\\) is the physical property and \\(m\\) is the model, then
-
-        .. math::
-
-            p = \\log(m)
-
-        and
-
-        .. math::
-
-            m = \\exp(p)
-
-        NOTE: If you have a model which is log conductivity
-        (ie. \\(m = \\log(\\sigma)\\)),
-        you should be using an ExpMap
-
-    """
-
-    def __init__(self, mesh=None, nP=None, **kwargs):
-        super(DCTMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
-
-    def _transform(self, m):
-        return Utils.mkvc(dct(dct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
-
-    def deriv(self, m, v=None):
-        if v is not None:
-            return dct(dct(v.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho')
-        else:
-            print "not implemented"
-
-    def inverse(self, m):
-        return Utils.mkvc(idct(idct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
-
-
-class iDCTMap(IdentityMap):
-    """
-        Changes the physical proprety into the model
-
-        If \\(p\\) is the physical property and \\(m\\) is the model, then
-
-        .. math::
-
-            p = \\log(m)
-
-        and
-
-        .. math::
-
-            m = \\exp(p)
-
-        NOTE: If you have a model which is log conductivity
-        (ie. \\(m = \\log(\\sigma)\\)),
-        you should be using an ExpMap
-
-    """
-
-    def __init__(self, mesh, nP=None, **kwargs):
-        super(iDCTMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
-
-    def _transform(self, m):
-        return Utils.mkvc(idct(idct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
-
-    def deriv(self, m, v=None):
-        if v is not None:
-            return idct(idct(v.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho')
-        else:
-            print "not implemented"
-
-    def inverse(self, m):
-        return Utils.mkvc(dct(dct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
-
-idctmap = iDCTMap(mesh) 
-dctmap = DCTMap(mesh) 
-
 import spgl1
 
 #Parameter for SPGL1 iterations
 nits = 10
-mdct = (-5.)*np.ones_like(mtrue)
+mID = (-5.)*np.ones_like(mtrue)
 it = 0
 phi_d_normal = np.load('../../NormalInversion/NormalInversion/phid_normal.npy')
 ratio = np.r_[6.5,phi_d_normal[0:-1]/phi_d_normal[1:]]
@@ -290,36 +210,36 @@ survey.dobs = d
 survey.std = np.ones_like(d)*0.05
 survey.eps = 1e-5*np.linalg.norm(survey.dobs)
 dmisfitall = []
-dmisfitall.append(dmis.eval(mdct)/survey.nD)
+dmisfitall.append(dmis.eval(mID)/survey.nD)
 
-print "end iteration: ",it, '; Overall Normalized Misfit: ', dmis.eval(mdct)/survey.nD
+print "end iteration: ",it, '; Overall Normalized Misfit: ', dmis.eval(mID)/survey.nD
 
-while (dmis.eval(mdct)/survey.nD)>0.5 and it<nits:
+while (dmis.eval(mID)/survey.nD)>0.5 and it<nits:
     
     def JS(x,mode):
         if mode == 1:
-            return problem.Jvec(mdct,x)
+            return problem.Jvec(mID,x)
         else:
-            return problem.Jtvec(mdct,x)
+            return problem.Jtvec(mID,x)
     
-    b = survey.dpred(mdct)-survey.dpred(mtrue)
+    b = survey.dpred(mID)-survey.dpred(mtrue)
     opts = spgl1.spgSetParms({'iterations':100, 'verbosity':2})
     sigtol = np.linalg.norm(b)/np.maximum(ratio[it],min_progress)
     #tautol = 20000.
     x,resid,grad,info = spgl1.spg_bpdn(JS, b, sigma = sigtol,options=opts)
     #x,resid,grad,info = spgl1.spg_lasso(JS,b,tautol,opts)
-    #assert dmis.eval(mdct) > dmis.eval(mdct - x)
-    mdct = mdct - x
+    #assert dmis.eval(mID) > dmis.eval(mID - x)
+    mID = mID - x
     it +=1
-    print "end iteration: ",it, '; Normalized Misfit: ', dmis.eval(mdct)/survey.nD
-    dmisfitall.append(dmis.eval(mdct)/survey.nD)
+    print "end iteration: ",it, '; Normalized Misfit: ', dmis.eval(mID)/survey.nD
+    dmisfitall.append(dmis.eval(mID)/survey.nD)
     xlist.append(x)
 
 np.save('./dmisfitall.npy',dmisfitall)
-np.save('./mfinal.npy',mdct)
+np.save('./mfinal.npy',mID)
 np.savez('./xlist.npz',xlist)
 
-mm = mesh.plotImage(mdct)
+mm = mesh.plotImage(mID)
 plt.colorbar(mm[0])
 plt.gca().set_xlim([-10.,10.])
 plt.gca().set_ylim([-10.,0.])
