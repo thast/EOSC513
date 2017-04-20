@@ -1,0 +1,9 @@
+numpy
+scipy
+ipython
+matplotlib
+cython
+SimPEG
+pywt
+copy
+-e git:https://github.com/rowanc1/pymatsolver
