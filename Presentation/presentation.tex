@@ -195,7 +195,7 @@ R(m) = \frac{1}{2} ||W(m-m_{ref})||_2^2
 
 \begin{align}
 f(m) &= \frac{1}{2} ||r(m)||_2^2 + \beta ||W(m-m_{ref})||_2^2 \\
-f(m+\delta m) &= \frac{1}{2} ||r(m)+J(m)\delta m||_2^2 + \beta ||W(m-m_{ref})||_2^2
+f(m+\delta m) &= \frac{1}{2} ||r(m)+J(m)\delta m||_2^2 + \beta ||W(m+\delta m-m_{ref})||_2^2
 \end{align}
 
 %Solve:
@@ -282,22 +282,31 @@ We have then experiment several strategies for updating W.
 
 \begin{frame}{Formulating the GN subproblem}
 
-Original Gauss-Newton subproblem:
+Original Data fitting subproblem:
 \begin{align}
-(J^TJ+\beta W^TW)\delta m = -J^Tr(m) - \beta W^TW(m-m_{ref})
+\text{min}_{\delta m} \frac{1}{2} ||J(m)\delta m + r(m)||_2^2 + \beta ||W(m+\delta m-m_{ref})||_2^2
 \end{align}
+
+%\begin{align}
+%(J^TJ+\beta W^TW)\delta m = -J^Tr(m) - \beta W^TW(m-m_{ref})
+%\end{align}
+
+%\begin{align}
+%(J^TJ+\beta W^TW)\delta m = -J^Tr(m) - \beta W^TW(m-m_{ref})
+%\end{align}
 
 Now without the L2 penalty but a L1 constrain in some space:
 \begin{align}
-\text{min} ||\delta x||_1 ~\text{s.t}~ ||J(m)S^H \delta x - r(m)||^2_2 < tol
+\text{min} ||\delta x||_1 ~\text{s.t}~ ||J(m)S^H \delta x + r(m)||^2_2 < tol
 \end{align}
 
 \begin{itemize}
 \item $\delta x = S \delta m$
 \item $S$ a sparsifying matrix  
 \item $S^H$ the inverse transform.
-\item solved using SPGL1
-\item tolerance is chosen such that it performs at least as the L2-norm regularized problem for each GN step
+\item solved using SPGL1 \\
+{\color{gray} E. van den Berg and M. P. Friedlander, "Probing the Pareto frontier for basis pursuit solutions", SIAM J. on Scientific Computing, 31(2):890-912, November 2008}
+%\item tolerance is chosen such that it performs at least as the L2-norm regularized problem for each GN step
 \end{itemize}
 \end{frame}
 
@@ -332,7 +341,7 @@ Now without the L2 penalty but a L1 constrain in some space:
 \end{frame}
 
 
-\begin{frame}{Recovered Models using sparse GN update}
+\begin{frame}{Recovered Models using sparse GN update: S = Identity or DCT }
 \begin{itemize}
   \item Without Source Encoding
 \end{itemize}
@@ -340,13 +349,42 @@ Now without the L2 penalty but a L1 constrain in some space:
   \subfigure{\includegraphics[width=59mm]{figures/recoveredModel.png}}
   \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseId.png}}
   \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseDCT.png}}
-  \subfigure{\includegraphics[width=30mm]{figures/Convergence_Sparse_withoutW.png}}
+  %\subfigure{\includegraphics[width=30mm]{figures/Convergence_Sparse_withoutW.png}}
 
 \end{figure}
 
 \end{frame}
 
-\begin{frame}{Recovered Models using sparse GN update}
+\begin{frame}{Recovered Models using sparse GN update in Wavelets space}
+\begin{itemize}
+  \item Without Source Encoding
+\end{itemize}
+\begin{figure}
+  \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseWVT_DB1_withoutW.png}}
+  \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseWVT_DB2_withoutW.png}}
+  \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseWVT_DB3_withoutW.png}}
+  \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseWVT_DB4_withoutW.png}}
+\end{figure}
+\end{frame}
+
+\begin{frame}{Coherency of J and Wavelet transform}
+\begin{columns}
+\begin{column}{0.6\textwidth}
+\begin{figure}
+  \subfigure{\includegraphics[width=30mm]{figures/Coherency_Wavelet.png}}
+  \subfigure{\includegraphics[width=30mm]{figures/Coherency_WaveletDB2.png}} \\
+  \subfigure{\includegraphics[width=30mm]{figures/Coherency_WaveletDB3.png}}
+  \subfigure{\includegraphics[width=30mm]{figures/Coherency_WaveletDB4.png}}
+\end{figure}
+\end{column}
+\begin{column}{0.4\textwidth}
+Possible explanation (hypothesis): asymptotic Incoherence \\
+{\color{gray}Adcock, Ben, et al. "Breaking the coherence barrier: A new theory for compressed sensing." Forum of Mathematics, Sigma. Vol. 5. Cambridge University Press, 2017.}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Recovered Models using sparse GN update and Simultaneous Sources}
 \begin{itemize}
   \item With Source Encoding
 \end{itemize}
@@ -354,38 +392,71 @@ Now without the L2 penalty but a L1 constrain in some space:
   \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_L2_withW.png}}
   \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseId_withW.png}}
   \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseDCT_withW.png}}
-  \subfigure{\includegraphics[width=30mm]{figures/Convergence_Sparse_withW.png}}
+  \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseWVT_DB4_withtW.png}}
 \end{figure}
 \end{frame}
+
+
+\begin{frame}{Convergence Comparison}
+
+\begin{figure}
+  \subfigure{\includegraphics[width=49mm]{figures/Convergence_Sparse_withoutW.png}}
+  \subfigure{\includegraphics[width=49mm]{figures/Convergence_Sparse_withW.png}}
+\end{figure}
+\begin{itemize}
+  \item L2 is still faster as each SPGL1 GN update is much more expansive to compute
+  \item SPGL1 GN update seems even harder with Sim. Srcs!
+\end{itemize}
+\end{frame}
+
+
 
 \begin{frame}{A curious behaviour}
 \begin{itemize}
-  \item Simulateneous Sources is killing sparsity
+  \item Simulateneous Sources is killing the sparsity
 \end{itemize}
 \begin{figure}
-  \subfigure{\includegraphics[width=59mm]{figures/SimSrc_kills_Sparsity_DCT.png}}
-  \subfigure{\includegraphics[width=59mm]{figures/SimSrc_kills_Sparsity_Id.png}}
+  \subfigure{\includegraphics[width=39mm]{figures/SimSrc_kills_Sparsity_WVT_DB4.png}}
+  \subfigure{\includegraphics[width=39mm]{figures/SimSrc_kills_Sparsity_DCT.png}}
+  \subfigure{\includegraphics[width=39mm]{figures/SimSrc_kills_Sparsity_Id.png}}
 \end{figure}
 
 \end{frame}
+
 
 \section{Discussion and Conclusion}
 
 \begin{frame}{Discussion and Conclusion}
 \begin{itemize}
   \item Simultaneous Sources
+  \vspace{10pt}
   \begin{itemize}
-    \item In terms of number of PDE solved, the overall convergence rate is similar or worse
+    \item In terms of number of PDE solved for L2, the overall convergence rate is similar or worse
+    \vspace{10pt}
     \item each step is a lot less memory-expansive, Useful if we have too many sources for our memory
-  \end{itemize}
-  \item Sparse GN Update
-  \begin{itemize}
-    \item Antagonization between sparsity in model space and the diffusive behavior of the Jacobian
-    \item Sparse update in model space are expansive to solve, sparse in DCT space is easier but recovered model is still smooth and display periodic patterns
-    \item Simultaneous Sources has been a killer for sparsity during our experiment. Several hypothesis can be formulated to explain this behavior but no definitive answer.
+    \vspace{10pt}
+    \item for SPGL1, it has appeared to make things even worse, with longer time necessary to compute each GN update
   \end{itemize}
 \end{itemize}
 \end{frame}
+
+\begin{frame}{Discussion and Conclusion}
+\begin{itemize}
+  \item Sparse GN Update
+  \begin{itemize}
+    \item At first, antagonization between sparsity in model space and the diffusive behavior of the Jacobian
+    \vspace{3pt}
+    \item Sparse update in model space are expansive to solve, sparse in DCT space is easier but recovered model is still smooth and display periodic patterns
+    \vspace{3pt}
+    \item Surprisingly, Wavelets have been an efficient transform despite a somehow high maximum for coherency
+    \vspace{3pt}
+    \item Simultaneous Sources has been a killer both for sparsity and computation times during our experiment
+    \vspace{3pt}
+    \item We did not study much the influence of the tolerance for the data fitting term in SPGL1 or the strategy to set it. Considering the time required for each iteration and the few iterations required to reach the target, we have probably been quite strict.
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
 
 \begin{frame}
 
