@@ -16,13 +16,12 @@ from pymatsolver import PardisoSolver
 from scipy.interpolate import LinearNDInterpolator, interp1d
 from sklearn.mixture import GaussianMixture
 from SimPEG import DataMisfit, Regularization, Optimization, InvProblem, Directives, Inversion
-import SimPEG
-import scipy.sparse as sp
+import time
 
 #2D model
 csx, csy, csz = 0.25,0.25,0.25
 # Number of core cells in each directiPon s
-ncx, ncz = 123,41
+ncx, ncz = 2**7-24,2**7-12
 # Number of padding cells to add in each direction
 npad = 12
 # Vectors of cell lengthts in each direction
@@ -90,6 +89,7 @@ mm = meshCore.plotImage(mtrue[actind],ax = ax0)
 plt.colorbar(mm[0])
 ax0.set_aspect("equal")
 #plt.show()
+
 
 def getCylinderPoints(xc,zc,r):
     xLocOrig1 = np.arange(-r,r+r/10.,r/10.)
@@ -165,250 +165,153 @@ survey = DC.Survey(srclist)
 problem = DC.Problem3D_CC(mesh, sigmaMap=mapping)
 problem.pair(survey)
 problem.Solver = PardisoSolver
-survey.dobs = survey.dpred(mtrue)
-survey.std = 0.05*np.ones_like(survey.dobs)
+dmis = DataMisfit.l2_DataMisfit(survey)
+survey.dpred(mtrue)
+survey.makeSyntheticData(mtrue,std=0.05,force=True)
 survey.eps = 1e-5*np.linalg.norm(survey.dobs)
-dmisAll = DataMisfit.l2_DataMisfit(survey)
-
 
 print '# of data: ', survey.dobs.shape
 
-class SimultaneousSrc(DC.Src.BaseSrc):
-    """
-    Dipole source
-    """
-    QW = None
-    Q = None
-    W = None
-    def __init__(self, rxList,Q,W, **kwargs):
-        
-        SimPEG.Survey.BaseSrc.__init__(self, rxList, **kwargs)
-
-    def eval(self, prob):
-        return self.QW
-
-class SimultaneousRx(DC.Rx.BaseRx):
-    """
-    SimultaneousRx receiver
-    """
-
-    def __init__(self, locs, rxType='phi', **kwargs):
-        # We may not need this ...
-        SimPEG.Survey.BaseRx.__init__(self, locs, rxType)
-                    
-    @property
-    def nD(self):
-        """Number of data in the receiver."""
-        return self.locs.shape[0]
-
-        # Not sure why ...
-        # return int(self.locs[0].size / 2)
-
-    def getP(self, mesh, Gloc):
-        return self.locs
-
-P = []
-M = np.c_[np.arange(-12.,10+1,2),np.ones(12)*z]
-N = np.c_[np.arange(-10.,12+1,2),np.ones(12)*z]
-rx = DC.Rx.Dipole(M,N)
-P = rx.getP(mesh,'CC')
-
-
 from SimPEG.Maps import IdentityMap
-from scipy.fftpack import dct,idct
-class DCTMap(IdentityMap):
-    """
-        Changes the model into the physical property.
+import pywt
 
-        If \\(p\\) is the physical property and \\(m\\) is the model, then
-
-        .. math::
-
-            p = \\log(m)
-
-        and
-
-        .. math::
-
-            m = \\exp(p)
-
-        NOTE: If you have a model which is log conductivity
-        (ie. \\(m = \\log(\\sigma)\\)),
-        you should be using an ExpMap
-
-    """
+class WaveletMap(IdentityMap):
 
     def __init__(self, mesh=None, nP=None, **kwargs):
-        super(DCTMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
+        super(WaveletMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
 
-    def _transform(self, m):
-        return Utils.mkvc(dct(dct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
+    def _transform(self, m, wv = 'db4'):
+        coeff_wv = pywt.wavedecn(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'),wv, mode = 'per')
+        array_wv = pywt.coeffs_to_array(coeff_wv)        
+        return Utils.mkvc(array_wv[0])
 
-    def deriv(self, m, v=None):
+    def deriv(self, m, v=None, wv = 'db4'):
         if v is not None:
-            return dct(dct(v.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho')
+            coeff_wv = pywt.wavedecn(v.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'),wv, mode = 'per')
+            array_wv = pywt.coeffs_to_array(coeff_wv)        
+            return Utils.mkvc(array_wv[0])
         else:
             print "not implemented"
 
-    def inverse(self, m):
-        return Utils.mkvc(idct(idct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
+    def inverse(self, m, wv = 'db4'):
+        msyn = np.zeros(mesh.nC)
+        coeff_wv = pywt.wavedecn(msyn.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'),wv, mode = 'per')
+        array_wv = pywt.coeffs_to_array(coeff_wv)
+        coeff_back = pywt.array_to_coeffs(m.reshape(array_wv[0].shape, order = 'F'),array_wv[1])
+        coeff_m = pywt.waverecn(coeff_back,wv, mode = 'per')
+        return Utils.mkvc(coeff_m)
 
-
-class iDCTMap(IdentityMap):
-    """
-        Changes the physical proprety into the model
-
-        If \\(p\\) is the physical property and \\(m\\) is the model, then
-
-        .. math::
-
-            p = \\log(m)
-
-        and
-
-        .. math::
-
-            m = \\exp(p)
-
-        NOTE: If you have a model which is log conductivity
-        (ie. \\(m = \\log(\\sigma)\\)),
-        you should be using an ExpMap
-
-    """
+class iWaveletMap(IdentityMap):
 
     def __init__(self, mesh, nP=None, **kwargs):
-        super(iDCTMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
+        super(iWaveletMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
 
-    def _transform(self, m):
-        return Utils.mkvc(idct(idct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
+    def _transform(self, m, wv = 'db4'):
+        msyn = np.zeros(mesh.nC)
+        coeff_map = pywt.wavedecn(msyn.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'),wv, mode = 'per')
+        array_map = pywt.coeffs_to_array(coeff_map)
+        coeff_map = pywt.array_to_coeffs(m.reshape(array_map[0].shape,order= 'F'),array_map[1])
+        coeff_back_map = pywt.waverecn(coeff_map,wv, mode = 'per')
+        return Utils.mkvc(coeff_back_map)
 
-    def deriv(self, m, v=None):
+    def deriv(self, m, v=None, wv = 'db4'):
         if v is not None:
-            return idct(idct(v.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho')
+            coeff_wv = pywt.wavedecn(v.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'),wv, mode = 'per')
+            array_wv = pywt.coeffs_to_array(coeff_wv)
+            coeff_back = pywt.array_to_coeffs(v,array_wv[1])
+            coeff_m = pywt.waverecn(coeff_back,wv, mode = 'per')
+            return Utils.mkvc(coeff_m)        
         else:
             print "not implemented"
 
-    def inverse(self, m):
-        return Utils.mkvc(dct(dct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
+    def inverse(self, m, wv = 'db4'):
+        
+        coeff_wv = pywt.wavedecn(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'),wv, mode = 'per')
+        array_wv = pywt.coeffs_to_array(coeff_wv)        
+        return Utils.mkvc(array_wv[0])
 
-idctmap = iDCTMap(mesh) 
-dctmap = DCTMap(mesh) 
+wavmap = WaveletMap(mesh)
+iwavmap = iWaveletMap(mesh) 
 
 import spgl1
 
 #Parameter for SPGL1 iterations
 nits = 10
-mdct = (-5.)*np.ones_like(mtrue)
+mwav = (-5.)*np.ones_like(mtrue)
 it = 0
-#phi_d_normal = np.load('../phid_normal.npy')
-#ratio = np.r_[6.5,phi_d_normal[0:-1]/phi_d_normal[1:]]
-ratio = 10.*np.ones(nits)
+phi_d_normal = np.load('../../NormalInversion/NormalInversion/phid_normal.npy')
+ratio = np.r_[6.5,phi_d_normal[0:-1]/phi_d_normal[1:]]
+#ratio = 10.*np.ones(nits)
 min_progress = 1.2
 xlist = []
 
 #Parameters for W
-nsubSrc = 5
-InnerIt = 1
-dmisfitsub = []
-dmisfitall = []
-dmisfitall.append(dmisAll.eval(mdct)/survey.nD)
+#nsubSrc = 5
+#InnerIt = 1
+#dmisfitsub = []
 
 #Initialize Random Source
-W = np.random.randn(survey.nSrc,nsubSrc)
+#W = np.random.randn(survey.nSrc,nsubSrc)
 #problem.unpair()
 #roblem.pair(survey)
-Q = problem.getRHS()
-sub = problem.getRHS().dot(W)
+#Q = problem.getRHS()
+#sub = problem.getRHS().dot(W)
 
-rx_r = SimultaneousRx(locs=P)
-srcList_r = []
-for isrc in range(sub.shape[1]):
-    src_r = SimultaneousSrc([rx_r], Q=Q[:,isrc],W=W[:,isrc],QW =Q.dot(W)[:,isrc])
-    srcList_r.append(src_r)
-survey_r = DC.Survey(srcList_r)
+#rx_r = SimultaneousRx(locs=P)
+#srcList_r = []
+#for isrc in range(sub.shape[1]):
+#    src_r = SimultaneousSrc([rx_r], Q=Q[:,isrc],W=W[:,isrc],QW =Q.dot(W)[:,isrc])
+#    srcList_r.append(src_r)
+#survey_r = DC.Survey(srcList_r)
 
-problem.unpair()
-problem.pair(survey_r)
+#problem.unpair()
+#problem.pair(survey_r)
 
-d = survey_r.dpred(mtrue)
-survey_r.dobs = d
-survey_r.std = np.ones_like(d)*0.05
-survey_r.eps = 1e-5*np.linalg.norm(survey_r.dobs)
-dmis = DataMisfit.l2_DataMisfit(survey_r)
-dmisfitsub.append(dmis.eval(mdct)/survey_r.nD)
+d = survey.dpred(mtrue)
+survey.dobs = d
+survey.std = np.ones_like(d)*0.05
+survey.eps = 1e-5*np.linalg.norm(survey.dobs)
+dmisfitall = []
+dmisfitall.append(dmis.eval(mwav)/survey.nD)
 
-problem.unpair()
-problem.pair(survey)
+timespgl1 = []
 
-print "end iteration: ",it, '; Overall Normalized Misfit: ', dmisAll.eval(mdct)/survey.nD
+print "end iteration: ",it, '; Overall Normalized Misfit: ', dmis.eval(mwav)/survey.nD
 
-while (dmisAll.eval(mdct)/survey.nD)>0.5 and it<nits:
+while (dmis.eval(mwav)/survey.nD)>0.5 and it<nits:
     
-    problem.unpair()
-    problem.pair(survey_r)
-
     def JS(x,mode):
         if mode == 1:
-            return problem.Jvec(mdct,idctmap*x)
+            return problem.Jvec(mwav,iwavmap*x)
         else:
-            return dctmap*problem.Jtvec(mdct,x)
+            return wavmap*problem.Jtvec(mwav,x)
     
-    b = survey_r.dpred(mdct)-survey_r.dpred(mtrue)
-
-    print "# of data: ", b.shape
-
+    b = survey.dpred(mwav)-survey.dpred(mtrue)
+    print '# of data: ',b.shape
     opts = spgl1.spgSetParms({'iterations':100, 'verbosity':2})
     sigtol = np.linalg.norm(b)/np.maximum(ratio[it],min_progress)
     #tautol = 20000.
+
+    tic = time.clock()
+
     x,resid,grad,info = spgl1.spg_bpdn(JS, b, sigma = sigtol,options=opts)
+
+    toc = time.clock()
+    print 'SPGL1 chronometer: ',toc - tic
+    timespgl1.append(toc-tic)
     #x,resid,grad,info = spgl1.spg_lasso(JS,b,tautol,opts)
-    assert dmis.eval(mdct) > dmis.eval(mdct - idctmap*x)
-    mdct = mdct - idctmap*x
-    xlist.append(x)
+    #assert dmis.eval(mwav) > dmis.eval(mwav - iwavmap*x)
+    mwav = mwav - iwavmap*x
     it +=1
-    print "end iteration: ",it, '; Subsample Normalized Misfit: ', dmis.eval(mdct)/survey_r.nD
-    dmisfitsub.append(dmis.eval(mdct)/survey_r.nD)
+    print "end iteration: ",it, '; Normalized Misfit: ', dmis.eval(mwav)/survey.nD
+    dmisfitall.append(dmis.eval(mwav)/survey.nD)
+    xlist.append(x)
 
-    problem.unpair()
-    problem.pair(survey)
-    dmisfitall.append(dmisAll.eval(mdct)/survey.nD)
-    print "Dmisfit compared to full dataset: ",dmisAll.eval(mdct)/survey.nD
-
-    if np.mod(it,InnerIt) ==0:
-        W = np.random.randn(survey.nSrc,nsubSrc)
-        print 'update W'
-
-        #problem.unpair()
-        #roblem.pair(survey)
-        Q = problem.getRHS()
-        sub = problem.getRHS().dot(W)
-
-        rx_r = SimultaneousRx(locs=P)
-        srcList_r = []
-        for isrc in range(sub.shape[1]):
-            src_r = SimultaneousSrc([rx_r], Q=Q[:,isrc],W=W[:,isrc],QW =Q.dot(W)[:,isrc])
-            srcList_r.append(src_r)
-        survey_r = DC.Survey(srcList_r)
-        
-        problem.unpair()
-        problem.pair(survey_r)
-        dmis = DataMisfit.l2_DataMisfit(survey_r)
-
-        d = survey_r.dpred(mtrue)
-        survey_r.dobs = d
-        survey_r.std = np.ones_like(d)*0.05
-        survey_r.eps = 1e-5*np.linalg.norm(survey_r.dobs)
-        print "end Update W; iteration: ",it, '; New Subsample Normalized Misfit: ', dmis.eval(mdct)/survey_r.nD
-
-        problem.unpair()
-        problem.pair(survey)
-        
-np.save('./dmisfitsub.npy',dmisfitsub)
 np.save('./dmisfitall.npy',dmisfitall)
-np.save('./mfinal.npy',mdct)
+np.save('./mfinal.npy',mwav)
 np.savez('./xlist.npz',xlist)
-
-mm = mesh.plotImage(mdct)
+np.save('./time.npz',timespgl1)
+mm = mesh.plotImage(mwav)
 plt.colorbar(mm[0])
 plt.gca().set_xlim([-10.,10.])
 plt.gca().set_ylim([-10.,0.])

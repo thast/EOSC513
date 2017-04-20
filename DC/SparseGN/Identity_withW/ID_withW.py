@@ -291,8 +291,6 @@ class iDCTMap(IdentityMap):
     def inverse(self, m):
         return Utils.mkvc(dct(dct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
 
-idctmap = iDCTMap(mesh) 
-dctmap = DCTMap(mesh) 
 
 import spgl1
 
@@ -349,9 +347,9 @@ while (dmisAll.eval(mdct)/survey.nD)>0.5 and it<nits:
 
     def JS(x,mode):
         if mode == 1:
-            return problem.Jvec(mdct,idctmap*x)
+            return problem.Jvec(mdct,x)
         else:
-            return dctmap*problem.Jtvec(mdct,x)
+            return problem.Jtvec(mdct,x)
     
     b = survey_r.dpred(mdct)-survey_r.dpred(mtrue)
 
@@ -362,8 +360,8 @@ while (dmisAll.eval(mdct)/survey.nD)>0.5 and it<nits:
     #tautol = 20000.
     x,resid,grad,info = spgl1.spg_bpdn(JS, b, sigma = sigtol,options=opts)
     #x,resid,grad,info = spgl1.spg_lasso(JS,b,tautol,opts)
-    assert dmis.eval(mdct) > dmis.eval(mdct - idctmap*x)
-    mdct = mdct - idctmap*x
+    #assert dmis.eval(mdct) > dmis.eval(mdct - x)
+    mdct = mdct - x
     xlist.append(x)
     it +=1
     print "end iteration: ",it, '; Subsample Normalized Misfit: ', dmis.eval(mdct)/survey_r.nD

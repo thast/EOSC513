@@ -22,7 +22,7 @@ import scipy.sparse as sp
 #2D model
 csx, csy, csz = 0.25,0.25,0.25
 # Number of core cells in each directiPon s
-ncx, ncz = 123,41
+ncx, ncz = 2**7-24,2**7-12
 # Number of padding cells to add in each direction
 npad = 12
 # Vectors of cell lengthts in each direction
@@ -90,6 +90,7 @@ mm = meshCore.plotImage(mtrue[actind],ax = ax0)
 plt.colorbar(mm[0])
 ax0.set_aspect("equal")
 #plt.show()
+
 
 def getCylinderPoints(xc,zc,r):
     xLocOrig1 = np.arange(-r,r+r/10.,r/10.)
@@ -215,103 +216,69 @@ P = rx.getP(mesh,'CC')
 
 
 from SimPEG.Maps import IdentityMap
-from scipy.fftpack import dct,idct
-class DCTMap(IdentityMap):
-    """
-        Changes the model into the physical property.
+import pywt
 
-        If \\(p\\) is the physical property and \\(m\\) is the model, then
-
-        .. math::
-
-            p = \\log(m)
-
-        and
-
-        .. math::
-
-            m = \\exp(p)
-
-        NOTE: If you have a model which is log conductivity
-        (ie. \\(m = \\log(\\sigma)\\)),
-        you should be using an ExpMap
-
-    """
+class WaveletMap(IdentityMap):
 
     def __init__(self, mesh=None, nP=None, **kwargs):
-        super(DCTMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
+        super(WaveletMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
 
-    def _transform(self, m):
-        return Utils.mkvc(dct(dct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
+    def _transform(self, m, wv = 'db2'):
+        coeff_wv = pywt.wavedecn(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'),wv, mode = 'per')
+        array_wv = pywt.coeffs_to_array(coeff_wv)        
+        return Utils.mkvc(array_wv[0])
 
-    def deriv(self, m, v=None):
+    def deriv(self, m, v=None, wv = 'db2'):
         if v is not None:
-            return dct(dct(v.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho')
+            coeff_wv = pywt.wavedecn(v.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'),wv, mode = 'per')
+            array_wv = pywt.coeffs_to_array(coeff_wv)        
+            return Utils.mkvc(array_wv[0])
         else:
             print "not implemented"
 
-    def inverse(self, m):
-        return Utils.mkvc(idct(idct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
+    def inverse(self, m, wv = 'db2'):
+        msyn = np.zeros(mesh.nC)
+        coeff_wv = pywt.wavedecn(msyn.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'),wv, mode = 'per')
+        array_wv = pywt.coeffs_to_array(coeff_wv)
+        coeff_back = pywt.array_to_coeffs(m.reshape(array_wv[0].shape, order = 'F'),array_wv[1])
+        coeff_m = pywt.waverecn(coeff_back,wv, mode = 'per')
+        return Utils.mkvc(coeff_m)
 
-
-class iDCTMap(IdentityMap):
-    """
-        Changes the physical proprety into the model
-
-        If \\(p\\) is the physical property and \\(m\\) is the model, then
-
-        .. math::
-
-            p = \\log(m)
-
-        and
-
-        .. math::
-
-            m = \\exp(p)
-
-        NOTE: If you have a model which is log conductivity
-        (ie. \\(m = \\log(\\sigma)\\)),
-        you should be using an ExpMap
-
-    """
+class iWaveletMap(IdentityMap):
 
     def __init__(self, mesh, nP=None, **kwargs):
-        super(iDCTMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
+        super(iWaveletMap, self).__init__(mesh=mesh, nP=nP, **kwargs)
 
-    def _transform(self, m):
-        return Utils.mkvc(idct(idct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
+    def _transform(self, m, wv = 'db2'):
+        msyn = np.zeros(mesh.nC)
+        coeff_map = pywt.wavedecn(msyn.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'),wv, mode = 'per')
+        array_map = pywt.coeffs_to_array(coeff_map)
+        coeff_map = pywt.array_to_coeffs(m.reshape(array_map[0].shape,order= 'F'),array_map[1])
+        coeff_back_map = pywt.waverecn(coeff_map,wv, mode = 'per')
+        return Utils.mkvc(coeff_back_map)
 
-    def deriv(self, m, v=None):
+    def deriv(self, m, v=None, wv = 'db2'):
         if v is not None:
-            return idct(idct(v.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho')
+            coeff_wv = pywt.wavedecn(v.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'),wv, mode = 'per')
+            array_wv = pywt.coeffs_to_array(coeff_wv)
+            coeff_back = pywt.array_to_coeffs(v,array_wv[1])
+            coeff_m = pywt.waverecn(coeff_back,wv, mode = 'per')
+            return Utils.mkvc(coeff_m)        
         else:
             print "not implemented"
 
-    def inverse(self, m):
-        return Utils.mkvc(dct(dct(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'), axis=0,norm = 'ortho'), axis=1,norm = 'ortho'))
+    def inverse(self, m, wv = 'db2'):
+        
+        coeff_wv = pywt.wavedecn(m.reshape(self.mesh.nCx,self.mesh.nCy,order = 'F'),wv, mode = 'per')
+        array_wv = pywt.coeffs_to_array(coeff_wv)        
+        return Utils.mkvc(array_wv[0])
 
-idctmap = iDCTMap(mesh) 
-dctmap = DCTMap(mesh) 
+wavmap = WaveletMap(mesh)
+iwavmap = iWaveletMap(mesh) 
 
-import spgl1
+np.random.seed(2017)
 
-#Parameter for SPGL1 iterations
-nits = 10
-mdct = (-5.)*np.ones_like(mtrue)
-it = 0
-#phi_d_normal = np.load('../phid_normal.npy')
-#ratio = np.r_[6.5,phi_d_normal[0:-1]/phi_d_normal[1:]]
-ratio = 10.*np.ones(nits)
-min_progress = 1.2
-xlist = []
-
-#Parameters for W
 nsubSrc = 5
-InnerIt = 1
-dmisfitsub = []
-dmisfitall = []
-dmisfitall.append(dmisAll.eval(mdct)/survey.nD)
 
 #Initialize Random Source
 W = np.random.randn(survey.nSrc,nsubSrc)
@@ -330,59 +297,35 @@ survey_r = DC.Survey(srcList_r)
 problem.unpair()
 problem.pair(survey_r)
 
-d = survey_r.dpred(mtrue)
-survey_r.dobs = d
-survey_r.std = np.ones_like(d)*0.05
-survey_r.eps = 1e-5*np.linalg.norm(survey_r.dobs)
-dmis = DataMisfit.l2_DataMisfit(survey_r)
-dmisfitsub.append(dmis.eval(mdct)/survey_r.nD)
+J = lambda v:  problem.Jvec(mtrue,v)
+Jt = lambda v: problem.Jtvec(mtrue,v)
 
-problem.unpair()
-problem.pair(survey)
+x = np.zeros_like(mtrue)
+v = np.zeros(problem.survey.nD)
+print 'v shape: ',v.shape
+indx = np.random.permutation(len(x))
+indv = np.random.permutation(len(v))
 
-print "end iteration: ",it, '; Overall Normalized Misfit: ', dmisAll.eval(mdct)/survey.nD
+coeff = 50
+mu = np.zeros([coeff, coeff])
+for i in range(coeff):
+    print 'iteration: ',i
+    for j in range(coeff):
+        x = np.zeros_like(mtrue)
+        v = np.zeros(problem.survey.nD)
+        x[indx[i]] = 1.
+        v[indv[np.mod(j,len(v))]] = 1.
+        x = iwavmap*x
 
-while (dmisAll.eval(mdct)/survey.nD)>0.5 and it<nits:
-    
-    problem.unpair()
-    problem.pair(survey_r)
-
-    def JS(x,mode):
-        if mode == 1:
-            return problem.Jvec(mdct,idctmap*x)
-        else:
-            return dctmap*problem.Jtvec(mdct,x)
-    
-    b = survey_r.dpred(mdct)-survey_r.dpred(mtrue)
-
-    print "# of data: ", b.shape
-
-    opts = spgl1.spgSetParms({'iterations':100, 'verbosity':2})
-    sigtol = np.linalg.norm(b)/np.maximum(ratio[it],min_progress)
-    #tautol = 20000.
-    x,resid,grad,info = spgl1.spg_bpdn(JS, b, sigma = sigtol,options=opts)
-    #x,resid,grad,info = spgl1.spg_lasso(JS,b,tautol,opts)
-    assert dmis.eval(mdct) > dmis.eval(mdct - idctmap*x)
-    mdct = mdct - idctmap*x
-    xlist.append(x)
-    it +=1
-    print "end iteration: ",it, '; Subsample Normalized Misfit: ', dmis.eval(mdct)/survey_r.nD
-    dmisfitsub.append(dmis.eval(mdct)/survey_r.nD)
-
-    problem.unpair()
-    problem.pair(survey)
-    dmisfitall.append(dmisAll.eval(mdct)/survey.nD)
-    print "Dmisfit compared to full dataset: ",dmisAll.eval(mdct)/survey.nD
-
-    if np.mod(it,InnerIt) ==0:
+        problem.unpair()
+        problem.pair(survey)
+        #Initialize Random Source
         W = np.random.randn(survey.nSrc,nsubSrc)
-        print 'update W'
-
         #problem.unpair()
         #roblem.pair(survey)
         Q = problem.getRHS()
         sub = problem.getRHS().dot(W)
-
+        
         rx_r = SimultaneousRx(locs=P)
         srcList_r = []
         for isrc in range(sub.shape[1]):
@@ -392,27 +335,34 @@ while (dmisAll.eval(mdct)/survey.nD)>0.5 and it<nits:
         
         problem.unpair()
         problem.pair(survey_r)
-        dmis = DataMisfit.l2_DataMisfit(survey_r)
 
-        d = survey_r.dpred(mtrue)
-        survey_r.dobs = d
-        survey_r.std = np.ones_like(d)*0.05
-        survey_r.eps = 1e-5*np.linalg.norm(survey_r.dobs)
-        print "end Update W; iteration: ",it, '; New Subsample Normalized Misfit: ', dmis.eval(mdct)/survey_r.nD
+        J = lambda v:  problem.Jvec(mtrue,v)
+        Jt = lambda v: problem.Jtvec(mtrue,v)
 
-        problem.unpair()
-        problem.pair(survey)
-        
-np.save('./dmisfitsub.npy',dmisfitsub)
-np.save('./dmisfitall.npy',dmisfitall)
-np.save('./mfinal.npy',mdct)
-np.savez('./xlist.npz',xlist)
+        v = Jt(v)
+        x = x/np.linalg.norm(x)
+        v = v/np.linalg.norm(v)
+        mu[i,j] = x.dot(v)
 
-mm = mesh.plotImage(mdct)
-plt.colorbar(mm[0])
-plt.gca().set_xlim([-10.,10.])
-plt.gca().set_ylim([-10.,0.])
-plt.plot(cylinderPoints0[:,0],cylinderPoints0[:,1], linestyle = 'dashed', color='k')
-plt.plot(cylinderPoints1[:,0],cylinderPoints1[:,1], linestyle = 'dashed', color='k')
+np.save('./mu.npy',mu)
+np.savez('./mu.npz',mu)
+
+fig0 = plt.figure(figsize=(10,8))
+ax0 = fig0.add_subplot(111)
+mm = ax0.matshow(np.log10(np.abs(mu)), cmap="jet")
+mm.set_clim(vmin=-8., vmax=0.)
+cb = plt.colorbar(mm)
+cb.set_label("Log10 |< * , * >|", fontsize=20)
+cb.ax.tick_params(labelsize=20)
+
+ax0.set_aspect("equal")
+ax0.set_xlabel("columns of $J^T$",fontsize = 20)
+ax0.set_ylabel("columns of $S^H$",fontsize =20)
+ax0.set_title("Coherency of $J^T$ with $S^H$, $S$ the Wavlet DB4 Transform with Source Encoding",fontsize = 22)
+ax0.text(0.,1.1*coeff,"Minimum = %g"%(np.abs(mu).min()),fontsize =20)
+ax0.text(0.,1.15*coeff,"Maximum = %.2f"%(np.abs(mu).max()),fontsize =20)
+ax0.tick_params(labelsize = 16)
+
+fig0.savefig('./coh_WVT_DB4_withW_Gauss.png')
 
 plt.show()
