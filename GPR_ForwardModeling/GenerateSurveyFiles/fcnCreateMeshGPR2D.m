@@ -20,9 +20,9 @@ function fcnCreateMeshGPR2D(workDir)
 
 % Obtain parameters from the parameter file
 
-paramFile = strcat(workDir,'\parametersMeshGPR2D') ;
+paramFile = strcat(workDir,'/parametersMeshGPR2D.m') ;
 
-paramFileAssert = strcat(workDir,'\parametersMeshGPR2D.m') ;
+paramFileAssert = strcat(workDir,'/parametersMeshGPR2D.m') ;
 assert(exist(paramFileAssert)==2,'Parameters file does not exist or has incorrect name') ;
 run(paramFile)
 
@@ -30,7 +30,7 @@ run(paramFile)
 hxc = strcat(num2str(dh(1),'%g'),'*',num2str(nc(1),'%g')) ;
 hzc = strcat(num2str(dh(2),'%g'),'*',num2str(nc(2),'%g')) ;
 
-Filename = strcat(workDir,'\meshGPR2D.txt') ;
+Filename = strcat(workDir,'/meshGPR2D.txt') ;
 
 % Open File
 fid = fopen(Filename,'w') ;

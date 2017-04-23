@@ -25,7 +25,7 @@
 \author[]{%
   Thibaut Astic
   }
-\title[]{Application of compressive sensing ideas to Static Electromagnetic Geophysics}
+\title[]{Simultaneous Sources and Sparse Update for Static Electromagnetic Geophysics}
 \date[]{EOSC 513 2017: Project \\ https://github.com/thast/EOSC513}
 
 % \titlegraphic{\includegraphics[width=22mm]{figures/Kinv}}
@@ -246,11 +246,13 @@ Update m: $m_{k+1} = m_k+\alpha \delta m$ s.t $f(m_{k+1}) < \gamma f(m_{k})$
 
 \end{frame}
 
-\section{Source Encoding}
+\section{Simultaneous Sources}
 
 \begin{frame}{Reducing the number of Sources}
 
-We start to try one of the basic idea of Compressive Sensing by using simultaneous sources.
+We start to try one of the basic idea of Compressive Sensing by using simultaneous sources. \\
+{\color{gray}E. Haber, M. Chung, and F. Herrmann, “An Effective Method for Parameter Estimation with PDE Constraints with Multiple Right-Hand Sides,” 
+SIAM Journal on Optimization, vol. 22, no. 3, pp. 739–757, jul 2012.}
 
 \begin{align}
 f(m) & = \frac{1}{2} ||PA(m)^{-1}QW-DW||_F^2  +\beta R(m)
@@ -343,7 +345,7 @@ Now without the L2 penalty but a L1 constrain in some space:
 
 \begin{frame}{Recovered Models using sparse GN update: S = Identity or DCT }
 \begin{itemize}
-  \item Without Source Encoding
+  \item Without simultaneous sources
 \end{itemize}
 \begin{figure}
   \subfigure{\includegraphics[width=59mm]{figures/recoveredModel.png}}
@@ -357,13 +359,21 @@ Now without the L2 penalty but a L1 constrain in some space:
 
 \begin{frame}{Recovered Models using sparse GN update in Wavelets space}
 \begin{itemize}
-  \item Without Source Encoding
+  \item Without simultaneous sources
 \end{itemize}
 \begin{figure}
   \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseWVT_DB1_withoutW.png}}
   \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseWVT_DB2_withoutW.png}}
   \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseWVT_DB3_withoutW.png}}
   \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_SparseWVT_DB4_withoutW.png}}
+\end{figure}
+\end{frame}
+
+\begin{frame}{Recovered Models using sparse GN update in Wavelets space}
+
+\begin{figure}
+  \subfigure{\includegraphics[width=100mm]{figures/recoveredModel.png}}
+  \subfigure{\includegraphics[width=100mm]{figures/recoveredModel_SparseWVT_DB4_withoutW.png}}
 \end{figure}
 \end{frame}
 
@@ -386,7 +396,7 @@ Possible explanation (hypothesis): asymptotic Incoherence \\
 
 \begin{frame}{Recovered Models using sparse GN update and Simultaneous Sources}
 \begin{itemize}
-  \item With Source Encoding
+  \item With simultaneous sources
 \end{itemize}
 \begin{figure}
   \subfigure{\includegraphics[width=59mm]{figures/recoveredModel_L2_withW.png}}
@@ -405,15 +415,15 @@ Possible explanation (hypothesis): asymptotic Incoherence \\
 \end{figure}
 \begin{itemize}
   \item L2 is still faster as each SPGL1 GN update is much more expansive to compute
-  \item SPGL1 GN update seems even harder with Sim. Srcs!
+  \item SPGL1 GN update seems even harder with Simultaneous Sources!
 \end{itemize}
 \end{frame}
 
 
 
-\begin{frame}{A curious behaviour}
+\begin{frame}{A curious behavior}
 \begin{itemize}
-  \item Simulateneous Sources is killing the sparsity
+  \item Simultaneous Sources is killing the sparsity
 \end{itemize}
 \begin{figure}
   \subfigure{\includegraphics[width=39mm]{figures/SimSrc_kills_Sparsity_WVT_DB4.png}}

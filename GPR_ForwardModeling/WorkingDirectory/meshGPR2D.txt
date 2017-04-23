@@ -1,4 +1,4 @@
 802 602 ! Number of Cells [x z]
 -20.1 -20.1 ! Bottom Southwest Corner [x z]
-0.1 0.05*800 0.1 ! Cell widths x-direction
-0.1 0.05*600 0.1 ! Cell widths z-direction
+0.075 0.05*800 0.075 ! Cell widths x-direction
+0.075 0.05*600 0.075 ! Cell widths z-direction

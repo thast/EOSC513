@@ -1,17 +1,17 @@
 function GPR2D_FWD(workDir)
 
 % PARAMETERS FOR FORWARD MODEL
-paramFile = strcat(workDir,'\parametersGPR2D_FWD') ;
+paramFile = strcat(workDir,'/parametersGPR2D_FWD') ;
 
-paramFileAssert = strcat(workDir,'\parametersGPR2D_FWD.m') ;
+paramFileAssert = strcat(workDir,'/parametersGPR2D_FWD.m') ;
 assert(exist(paramFileAssert)==2,'Parameters file does not exist or has incorrect name') ;
 run(paramFile);
 
 % Add full path to files
-codeDir   = strcat(codeDir,'\FunctionsFWD') ;
-TxRxFile  = strcat(workDir,'\',TxRxFile) ;
-meshFile  = strcat(workDir,'\',meshFile) ;
-modelFile = strcat(workDir,'\',modelFile) ;
+codeDir   = strcat(codeDir,'/FunctionsFWD') ;
+TxRxFile  = strcat(workDir,'/',TxRxFile) ;
+meshFile  = strcat(workDir,'/',meshFile) ;
+modelFile = strcat(workDir,'/',modelFile) ;
 
 addpath(codeDir)
 
@@ -78,7 +78,7 @@ end
 
 % WRITE OUTPUT FILE
 
-dataFilename = strcat(workDir,'\dpreGPR2DFWD.txt') ;
+dataFilename = strcat(workDir,'/dpreGPR2DFWD.txt') ;
 writeGPR2Ddata(surveyObj,dataFilename) ;
 
 fprintf('\n%s\n','DATA PREDICTED')

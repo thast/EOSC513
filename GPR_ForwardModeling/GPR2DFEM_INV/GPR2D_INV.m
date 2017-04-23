@@ -1,17 +1,17 @@
 function GPR2D_INV(workDir)
 
 % PARAMETERS FOR FORWARD MODEL
-paramFile = strcat(workDir,'\parametersGPR2D_INV') ;
+paramFile = strcat(workDir,'/parametersGPR2D_INV') ;
 
-paramFileAssert = strcat(workDir,'\parametersGPR2D_INV.m') ;
+paramFileAssert = strcat(workDir,'/parametersGPR2D_INV.m') ;
 assert(exist(paramFileAssert)==2,'Parameters file does not exist or has incorrect name') ;
 run(paramFile);
 
 % Add full path to files
-codeDir       = strcat(codeDir,'\FunctionsINV') ;
-dobsFile      = strcat(workDir,'\',dobsFile) ;
-meshFile      = strcat(workDir,'\',meshFile) ;
-modelFile     = strcat(workDir,'\',modelFile) ;
+codeDir       = strcat(codeDir,'/FunctionsINV') ;
+dobsFile      = strcat(workDir,'/',dobsFile) ;
+meshFile      = strcat(workDir,'/',meshFile) ;
+modelFile     = strcat(workDir,'/',modelFile) ;
 
 addpath(codeDir)
 
@@ -27,7 +27,8 @@ modelObj = loadmodelGPR2D(modelFile) ;
 
 % Load Survey File
 surveyObj = loadsurveyGPR2D(dobsFile) ;
-
+surveyObj.data
+size(surveyObj.data)
 fprintf('\n%s\n','FILES LOADED')
 
 %% OPERATORS, PROJECTION MATRICIES AND SOURCES
